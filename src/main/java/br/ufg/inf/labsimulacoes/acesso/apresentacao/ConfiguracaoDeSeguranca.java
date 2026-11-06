@@ -1,0 +1,39 @@
+package br.ufg.inf.labsimulacoes.acesso.apresentacao;
+
+import jakarta.servlet.DispatcherType;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Regras de acesso às rotas (RF-01, RNF-09). Tudo exige login, menos a tela de login e a verificação
+ * de saúde, usada pelo healthcheck do Docker.
+ *
+ * <p>A proteção CSRF fica ligada no padrão do Spring Security: o token é guardado na sessão e aceito
+ * no campo {@code _csrf} ou no cabeçalho {@code X-CSRF-TOKEN}, que é o usado nas requisições HTMX.
+ */
+@Configuration(proxyBeanMethods = false)
+class ConfiguracaoDeSeguranca {
+
+    @Bean
+    SecurityFilterChain filtroDeSeguranca(HttpSecurity http) throws Exception {
+        var sessaoExpirada = new SessaoExpirada();
+        return http
+                .authorizeHttpRequests(rotas -> rotas
+                        // Sem isto, um erro como o 403 do CSRF viraria redirecionamento para o login.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll()
+                        .anyRequest().authenticated())
+                .formLogin(login -> login.usernameParameter("email").passwordParameter("senha"))
+                .logout(logout -> logout.deleteCookies("JSESSIONID"))
+                // Com a estratégia definida, o Spring também a usa quando o token CSRF sumiu junto com
+                // a sessão expirada, em vez de responder 403.
+                .sessionManagement(sessao -> sessao.invalidSessionStrategy(sessaoExpirada))
+                .exceptionHandling(erros -> erros
+                        .defaultAuthenticationEntryPointFor(sessaoExpirada, SessaoExpirada::ehRequisicaoHtmx))
+                .build();
+    }
+}
