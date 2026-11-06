@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 env:
-  SONAR_ORGANIZATION: TROCAR_sua_organizacao
-  SONAR_PROJECT_KEY: TROCAR_seu_project_key
-
+  SONAR_ORGANIZATION: lab-simulacoes-conversacionais
+  SONAR_PROJECT_KEY: lab-simulacoes-conversacionais_lab-simulacoes-conversacionais
+  
 jobs:
   build-test:
     runs-on: ubuntu-latest
