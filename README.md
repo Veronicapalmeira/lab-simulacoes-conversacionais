@@ -12,7 +12,7 @@ Pré-requisito: **Docker** com Docker Compose. Para subir tudo, incluindo o Post
 docker compose up --build
 ```
 
-A aplicação aplica as migrations ao iniciar e fica em <http://localhost:8080>. Por enquanto ela não tem telas, então a resposta 404 em `/` é esperada. Para conferir se ela está conectada ao banco e ao Redis, acesse <http://localhost:8080/actuator/health>.
+A aplicação aplica as migrations ao iniciar e fica em <http://localhost:8080>. Sem login, as rotas levam para `/login`. Por enquanto ela não tem outras telas, então a resposta 404 em `/` depois de entrar é esperada. Para conferir se ela está conectada ao banco e ao Redis, acesse <http://localhost:8080/actuator/health>, que não exige login.
 
 Para parar, use `docker compose down`. Para apagar também os dados do banco, use `docker compose down -v`. Se alguma porta já estiver em uso, copie `.env.example` para `.env` e troque o valor.
 
@@ -34,6 +34,26 @@ Também é preciso ter o **JDK 21** com `JAVA_HOME` configurado. Não é preciso
 | `homologacao` | Na VM de homologação, com `SPRING_PROFILES_ACTIVE=homologacao` | Só variáveis de ambiente, sem valores padrão: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` e `REDIS_PASSWORD` |
 
 Senhas e chaves nunca entram no repositório. Valores pessoais ficam no `.env`, que o Git ignora.
+
+A variável `SESSAO_INATIVIDADE` vale nos dois perfis e define o tempo sem atividade até a sessão expirar. O padrão é `60m`, maior que uma hora-aula, e a menor unidade é o minuto.
+
+## Autenticação
+
+Só profissionais da escola têm conta (RF-01, RN-11). Todas as rotas exigem login, menos a tela de login e `/actuator/health`.
+
+- **Formulário de login:** `POST /login` com os campos `email`, `senha` e `_csrf`. Enquanto a tela da aplicação não existe, o Spring Security gera uma tela provisória em `/login`. A saída é `POST /logout`, também com o token CSRF.
+- **Senhas:** novos usuários são criados pelo `CadastroDeUsuarios`, que grava só o hash em Argon2id. Nunca grave em `usuario.senha_hash` por outro caminho.
+- **Mensagem de erro:** e-mail sem conta, usuário inativo e senha errada recebem a mesma resposta, para a tela não revelar quais contas existem.
+
+### CSRF nas requisições HTMX
+
+Todo envio que não seja `GET` precisa do token CSRF, e o HTMX o envia pelo cabeçalho `X-CSRF-TOKEN`. Basta declarar o cabeçalho uma vez no `<body>` do layout, que todos os elementos da página herdam:
+
+```html
+<body th:hx-headers='|{"X-CSRF-TOKEN": "${_csrf.token}"}|'>
+```
+
+Se a sessão tiver expirado, a requisição HTMX recebe 401 com `HX-Redirect: /login`, e o navegador vai para a tela de login em vez de colocá-la dentro do fragmento.
 
 ## Migrations
 
