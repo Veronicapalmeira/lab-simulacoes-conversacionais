@@ -6,14 +6,44 @@ Aplicação web única em Java, organizada como monólito modular com Spring Mod
 
 ## Como rodar localmente
 
-Pré-requisito: **JDK 21** com `JAVA_HOME` configurado. Não é preciso instalar o Maven, porque o projeto traz o Maven Wrapper.
+Pré-requisito: **Docker** com Docker Compose. Para subir tudo, incluindo o PostgreSQL e o Redis:
+
+```
+docker compose up --build
+```
+
+A aplicação aplica as migrations ao iniciar e fica em <http://localhost:8080>. Por enquanto ela não tem telas, então a resposta 404 em `/` é esperada. Para conferir se ela está conectada ao banco e ao Redis, acesse <http://localhost:8080/actuator/health>.
+
+Para parar, use `docker compose down`. Para apagar também os dados do banco, use `docker compose down -v`. Se alguma porta já estiver em uso, copie `.env.example` para `.env` e troque o valor.
+
+### Desenvolvendo fora do Docker
+
+Também é preciso ter o **JDK 21** com `JAVA_HOME` configurado. Não é preciso instalar o Maven, porque o projeto traz o Maven Wrapper. Os testes usam Testcontainers, então o Docker precisa estar rodando.
 
 | Ação | Linux/macOS/Git Bash | Windows (PowerShell) |
 | --- | --- | --- |
-| Compilar e rodar os testes | `./mvnw verify` | `.\mvnw.cmd verify` |
+| Subir só o PostgreSQL e o Redis | `docker compose up -d postgres redis` | `docker compose up -d postgres redis` |
 | Subir a aplicação | `./mvnw spring-boot:run` | `.\mvnw.cmd spring-boot:run` |
+| Compilar e rodar os testes | `./mvnw verify` | `.\mvnw.cmd verify` |
 
-A aplicação sobe em <http://localhost:8080>. Por enquanto ela não tem telas, então a resposta 404 em `/` é esperada.
+## Perfis de configuração
+
+| Perfil | Quando usar | Configuração |
+| --- | --- | --- |
+| `local` | Padrão, quando nenhum perfil é informado | Valores padrão que combinam com o `docker-compose.yml` |
+| `homologacao` | Na VM de homologação, com `SPRING_PROFILES_ACTIVE=homologacao` | Só variáveis de ambiente, sem valores padrão: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` e `REDIS_PASSWORD` |
+
+Senhas e chaves nunca entram no repositório. Valores pessoais ficam no `.env`, que o Git ignora.
+
+## Migrations
+
+O esquema do banco é só do Flyway: o Hibernate apenas confere (`ddl-auto=validate`). As migrations ficam em `src/main/resources/db/migration`.
+
+- **Nome:** data e hora no formato `V20261110_1430__descricao.sql`, para que duas branches nunca criem o mesmo número.
+- **Migration aplicada não muda:** para corrigir algo, crie uma migration nova.
+- **Só adicionar estruturas:** a imagem anterior precisa continuar funcionando no mesmo banco, para que a reversão seja só trocar a tag da imagem (RNF-12). Nada de `DROP`, `RENAME` ou `ALTER COLUMN`. Coluna nova em tabela existente precisa aceitar nulo ou ter valor padrão, porque a imagem anterior não vai preenchê-la.
+
+O `MigrationsTest` falha o build se encontrar um comando destrutivo e confere que a imagem anterior sobe em um banco com migrations mais novas. A regra de coluna nova não é verificada automaticamente, então vale conferir na revisão.
 
 ## Módulos
 
