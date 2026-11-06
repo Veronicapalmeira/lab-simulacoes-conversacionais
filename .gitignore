@@ -11,4 +11,3 @@ target/
 
 # Configuração local e segredos
 .env
-application-local.*

@@ -1,0 +1,60 @@
+# Ambiente local de desenvolvimento. As portas ficam só em 127.0.0.1 e as credenciais são locais.
+# Para mudar algum valor, copie .env.example para .env.
+name: lab-simulacoes
+
+services:
+  app:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-lab_simulacoes}
+      DB_USER: ${DB_USER:-lab}
+      DB_PASSWORD: ${DB_PASSWORD:-lab_local}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 60s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-lab_simulacoes}
+      POSTGRES_USER: ${DB_USER:-lab}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lab_local}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Sem persistência em disco: tudo no Redis pode ser reconstruído do PostgreSQL (Stack, seção 5).
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-dados:
