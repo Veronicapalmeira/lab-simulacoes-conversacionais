@@ -1,0 +1,14 @@
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# Configuração local e segredos
+.env
+application-local.*
